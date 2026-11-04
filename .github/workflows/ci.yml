@@ -23,7 +23,7 @@ jobs:
       matrix:
         os:
           - ubuntu-24.04
-          - windows-2025
+          - windows-2022
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -49,7 +49,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-24.04
-          - os: windows-2025
+          - os: windows-2022
     steps:
       - name: Check out source
         uses: actions/checkout@v7
@@ -76,7 +76,6 @@ jobs:
           host: windows
           target: desktop
           arch: win64_msvc2022_64
-          modules: qtsvg qttools
 
       - name: Configure CMake
         run: >
