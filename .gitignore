@@ -1,5 +1,5 @@
 # This file is used to ignore files which are generated
-# ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------
 
 *~
 *.autosave
@@ -85,3 +85,7 @@ CMakeLists.txt.user*
 
 .vs
 out
+
+# Python test artifacts
+__pycache__/
+*.py[cod]

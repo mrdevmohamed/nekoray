@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-checks:
+    name: Repository checks / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-24.04
+          - windows-2025
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Check repository contracts
+        run: python -m unittest discover -s test -p "test_*.py" -v
+
+      - name: Check shell script syntax
+        if: runner.os == 'Linux'
+        run: bash test/test-shell-syntax.sh
+
+  build-cpp:
+    name: C++ build / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+          - os: windows-2025
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            cmake ninja-build g++ \
+            qt6-base-dev qt6-svg-dev qt6-tools-dev qt6-tools-dev-tools
+
+      - name: Set up MSVC
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Install Qt for Windows
+        if: runner.os == 'Windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.10.2"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtsvg qttools
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build -G Ninja
+          -DQT_VERSION_MAJOR=6
+          -DNKR_NO_EXTERNAL=ON
+          -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Qt application
+        run: cmake --build build --parallel 2

@@ -1,4 +1,5 @@
 name: AUR CI
+
 on:
   push:
     branches:
@@ -8,11 +9,22 @@ on:
       - 'LICENSE'
       - '!.github/workflows/**'
 
+permissions:
+  contents: read
+
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    env:
+      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
-      - uses: chitang233/aur-pkgbuild-builder@main
+      - name: Skip AUR publish when deploy key is not configured
+        if: env.DEPLOY_KEY == ''
+        run: 'echo "AUR publish skipped: configure the DEPLOY_KEY repository secret to enable it."'
+
+      - name: Update AUR package
+        if: env.DEPLOY_KEY != ''
+        uses: chitang233/aur-pkgbuild-builder@d44ae80e4bd09d6ba29fb5f36937529473212886
         with:
           deploy_key: ${{ secrets.DEPLOY_KEY }}
           package_name: 'nekoray-git'

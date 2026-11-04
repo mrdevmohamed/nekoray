@@ -1,26 +1,38 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-source libs/env_deploy.sh
-DEST=$DEPLOYMENT/windows64
-rm -rf $DEST
-mkdir -p $DEST
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/env_deploy.sh"
 
-#### copy exe ####
-cp $BUILD/nekobox.exe $DEST
+: "${DL_QT_VER:?DL_QT_VER must identify the Qt SDK version}"
 
-#### deploy qt & DLL runtime ####
-pushd $DEST
-windeployqt nekobox.exe --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw --verbose 2
-rm -rf translations
-rm -rf libEGL.dll libGLESv2.dll Qt6Pdf.dll
+DEST="${DEPLOYMENT}/windows64"
+rm -rf -- "${DEST}"
+mkdir -p -- "${DEST}"
 
-if [ "$DL_QT_VER" != "5.15" ]; then
-  cp $SRC_ROOT/qtsdk/Qt/bin/libcrypto-3-x64.dll .
-  cp $SRC_ROOT/qtsdk/Qt/bin/libssl-3-x64.dll .
+#### Copy executable ####
+if [[ ! -f "${BUILD}/nekobox.exe" ]]; then
+    printf 'error: C++ executable is missing: %s\n' "${BUILD}/nekobox.exe" >&2
+    exit 1
 fi
+cp -- "${BUILD}/nekobox.exe" "${DEST}/"
 
-popd
+#### Deploy Qt and DLL runtime ####
+(
+    cd "${DEST}"
+    windeployqt nekobox.exe --no-compiler-runtime --no-system-d3d-compiler --no-opengl-sw --verbose 2
+    rm -rf -- translations
+    rm -f -- libEGL.dll libGLESv2.dll Qt6Pdf.dll
 
-#### prepare deployment ####
-cp $BUILD/*.pdb $DEPLOYMENT
+    if [[ "${DL_QT_VER}" != "5.15" ]]; then
+        cp -- "${SRC_ROOT}/qtsdk/Qt/bin/libcrypto-3-x64.dll" .
+        cp -- "${SRC_ROOT}/qtsdk/Qt/bin/libssl-3-x64.dll" .
+    fi
+)
+
+#### Copy optional debug symbols ####
+shopt -s nullglob
+pdb_files=("${BUILD}"/*.pdb)
+if (( ${#pdb_files[@]} > 0 )); then
+    cp -- "${pdb_files[@]}" "${DEPLOYMENT}/"
+fi

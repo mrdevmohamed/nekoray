@@ -1,41 +1,67 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-source libs/env_deploy.sh
-ENV_NEKORAY=1
-source libs/get_source_env.sh
-pushd ..
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+source "${SCRIPT_DIR}/env_deploy.sh"
+source "${SCRIPT_DIR}/get_source_env.sh"
 
-####
+WORKSPACE_ROOT="$(cd -- "${SRC_ROOT}/.." && pwd -P)"
 
-if [ ! -d "sing-box" ]; then
-  git clone --no-checkout https://github.com/MatsuriDayo/sing-box.git
-fi
-pushd sing-box
-git checkout "$COMMIT_SING_BOX"
+checkout_pinned_source() {
+    local name="$1"
+    local repository="$2"
+    local revision="$3"
+    local destination="${WORKSPACE_ROOT}/${name}"
+    local created="false"
+    local origin
+    local actual_revision
 
-popd
+    if [[ ! "${revision}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        printf 'error: %s revision is not a full Git commit ID: %s\n' "${name}" "${revision}" >&2
+        return 1
+    fi
 
-####
+    if [[ ! -e "${destination}/.git" ]]; then
+        if [[ -e "${destination}" ]]; then
+            printf 'error: refusing to use non-Git dependency path: %s\n' "${destination}" >&2
+            return 1
+        fi
+        git clone --no-checkout "${repository}" "${destination}"
+        created="true"
+    fi
 
-if [ ! -d "sing-quic" ]; then
-  git clone --no-checkout https://github.com/MatsuriDayo/sing-quic.git
-fi
-pushd sing-quic
-git checkout "$COMMIT_SING_QUIC"
+    if ! git -C "${destination}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        printf 'error: dependency path is not a Git worktree: %s\n' "${destination}" >&2
+        return 1
+    fi
 
-popd
+    origin="$(git -C "${destination}" remote get-url origin)"
+    if [[ "${origin}" != "${repository}" ]]; then
+        printf 'error: %s has unexpected origin %s (expected %s)\n' "${name}" "${origin}" "${repository}" >&2
+        return 1
+    fi
 
-####
+    if [[ "${created}" != "true" ]] && [[ -n "$(git -C "${destination}" status --porcelain)" ]]; then
+        printf 'error: %s has local changes; refusing to overwrite them\n' "${destination}" >&2
+        return 1
+    fi
 
-if [ ! -d "libneko" ]; then
-  git clone --no-checkout https://github.com/MatsuriDayo/libneko.git
-fi
-pushd libneko
-git checkout "$COMMIT_LIBNEKO"
+    git -C "${destination}" fetch --no-tags origin "${revision}"
+    git -C "${destination}" checkout --detach "${revision}"
 
-popd
+    actual_revision="$(git -C "${destination}" rev-parse HEAD)"
+    if [[ "${actual_revision}" != "${revision}" ]]; then
+        printf 'error: %s checkout mismatch: expected %s, got %s\n' "${name}" "${revision}" "${actual_revision}" >&2
+        return 1
+    fi
 
-####
+    printf 'Pinned %s at %s\n' "${name}" "${actual_revision}"
+}
 
-popd
+: "${COMMIT_SING_BOX:?COMMIT_SING_BOX is not set}"
+: "${COMMIT_SING_QUIC:?COMMIT_SING_QUIC is not set}"
+: "${COMMIT_LIBNEKO:?COMMIT_LIBNEKO is not set}"
+
+checkout_pinned_source "sing-box" "${SING_BOX_REPO}" "${COMMIT_SING_BOX}"
+checkout_pinned_source "sing-quic" "${SING_QUIC_REPO}" "${COMMIT_SING_QUIC}"
+checkout_pinned_source "libneko" "${LIBNEKO_REPO}" "${COMMIT_LIBNEKO}"
