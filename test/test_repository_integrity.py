@@ -89,6 +89,21 @@ class RepositoryIntegrityTests(unittest.TestCase):
         self.assertIn("windows-2022", workflow)
         self.assertIn("cmake --build build", workflow)
 
+    def test_release_workflow_uses_supported_actions_and_runners(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "build-nekoray-cmake.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("actions/checkout@v7", workflow)
+        self.assertIn("actions/cache@v6", workflow)
+        self.assertIn("actions/setup-go@v7", workflow)
+        self.assertIn("actions/upload-artifact@v7", workflow)
+        self.assertIn("actions/download-artifact@v8", workflow)
+        self.assertIn("ubuntu-24.04", workflow)
+        self.assertNotIn("ubuntu-latest", workflow)
+        self.assertNotIn("ubuntu-20.04", workflow)
+        self.assertNotIn("actions/upload-artifact@v3", workflow)
+        self.assertNotIn("actions/download-artifact@v3", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()
