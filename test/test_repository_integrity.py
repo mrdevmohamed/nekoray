@@ -86,7 +86,7 @@ class RepositoryIntegrityTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("ubuntu-24.04", workflow)
-        self.assertIn("windows-2025", workflow)
+        self.assertIn("windows-2022", workflow)
         self.assertIn("cmake --build build", workflow)
 
 
