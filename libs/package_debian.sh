@@ -1,6 +1,20 @@
 #!/bin/bash
+set -Eeuo pipefail
+
+if [[ $# -ne 1 || -z "${1//[[:space:]]/}" ]]; then
+    printf 'Usage: %s <version>\n' "$0" >&2
+    exit 2
+fi
 
 version="$1"
+
+# Debian package versions must start with a digit. Release tags commonly use
+# a leading "v" (for example v1.0.0), so remove it only for DEBIAN/control.
+debian_version="${version#[vV]}"
+if [[ ! "${debian_version}" =~ ^[0-9][A-Za-z0-9.+:~-]*$ ]]; then
+    printf 'error: invalid Debian package version: %s (from release tag %s)\n' "${debian_version}" "${version}" >&2
+    exit 2
+fi
 
 mkdir -p nekoray/DEBIAN
 mkdir -p nekoray/opt
@@ -12,7 +26,7 @@ rm nekoray/opt/nekoray/launcher
 # basic
 cat >nekoray/DEBIAN/control <<-EOF
 Package: nekoray
-Version: $version
+Version: ${debian_version}
 Architecture: amd64
 Maintainer: MatsuriDayo nekoha_matsuri@protonmail.com
 Depends: libxcb-xinerama0, libqt5core5a, libqt5gui5, libqt5network5, libqt5widgets5, libqt5svg5, libqt5x11extras5, desktop-file-utils
@@ -25,7 +39,7 @@ if [ ! -s /usr/share/applications/nekoray.desktop ]; then
 [Desktop Entry]
 Name=nekoray
 Comment=Qt based cross-platform GUI proxy configuration manager (backend: sing-box)
-Exec=sh -c "PATH=/opt/nekoray:\$PATH /opt/nekoray/nekobox -appdata"
+Exec=sh -c "PATH=/opt/nekoray:\\$PATH /opt/nekoray/nekobox -appdata"
 Icon=/opt/nekoray/nekobox.png
 Terminal=false
 Type=Application
