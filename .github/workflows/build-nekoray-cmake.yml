@@ -12,6 +12,11 @@ on:
       artifact-pack:
         description: "artifact-pack: If want ignore"
         required: false
+
+# Build jobs only need read access. The publish job below gets write access.
+permissions:
+  contents: read
+
 jobs:
   build-go:
     strategy:
@@ -150,6 +155,9 @@ jobs:
     name: Pack & Publish Release
     if: github.event.inputs.artifact-pack != 'y'
     runs-on: ubuntu-24.04
+    # ghr creates/updates GitHub Releases through the repository contents API.
+    permissions:
+      contents: write
     needs:
       - build-cpp
       - build-go
