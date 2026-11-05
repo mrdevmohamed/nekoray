@@ -1,14 +1,26 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+APPIMAGETOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
+APPIMAGETOOL="appimagetool-x86_64.AppImage"
+APPDIR="nekobox.AppDir"
+OUTPUT="nekobox-x86_64.AppImage"
+
+cleanup() {
+    rm -f "${APPIMAGETOOL}"
+    rm -rf "${APPDIR}"
+}
+trap cleanup EXIT
 
 sudo apt-get install fuse -y
 
-cp -r linux64 nekobox.AppDir
+rm -rf "${APPDIR}"
+cp -a linux64 "${APPDIR}"
 
-# The file for Appimage
+# Prepare the AppImage desktop entry and launcher.
+rm -f "${APPDIR}/launcher"
 
-rm nekobox.AppDir/launcher
-
-cat >nekobox.AppDir/nekobox.desktop <<-EOF
+cat > "${APPDIR}/nekobox.desktop" <<'EOF'
 [Desktop Entry]
 Name=nekobox
 Exec=echo "nekobox started"
@@ -17,22 +29,40 @@ Type=Application
 Categories=Network
 EOF
 
-cat >nekobox.AppDir/AppRun <<-EOF
+cat > "${APPDIR}/AppRun" <<'EOF'
 #!/bin/bash
-echo "PATH: \${PATH}"
-echo "nekobox runing on: \$APPDIR"
-LD_LIBRARY_PATH=\${APPDIR}/usr/lib QT_PLUGIN_PATH=\${APPDIR}/usr/plugins \${APPDIR}/nekobox -appdata "\$@"
+echo "PATH: ${PATH}"
+echo "nekobox running on: $APPDIR"
+LD_LIBRARY_PATH=${APPDIR}/usr/lib QT_PLUGIN_PATH=${APPDIR}/usr/plugins ${APPDIR}/nekobox -appdata "$@"
 EOF
 
-chmod +x nekobox.AppDir/AppRun
+chmod +x "${APPDIR}/AppRun"
 
-# build
+# AppImageKit's old AppImageKit release is explicitly marked obsolete.
+# Use the maintained appimagetool continuous release instead.
+curl \
+    --fail \
+    --location \
+    --show-error \
+    --silent \
+    --retry 5 \
+    --retry-all-errors \
+    --retry-delay 2 \
+    --retry-max-time 120 \
+    --connect-timeout 20 \
+    --max-time 300 \
+    --output "${APPIMAGETOOL}" \
+    "${APPIMAGETOOL_URL}"
 
-curl -fLSO https://github.com/AppImage/AppImageKit/releases/latest/download/appimagetool-x86_64.AppImage
-chmod +x appimagetool-x86_64.AppImage
-./appimagetool-x86_64.AppImage nekobox.AppDir
+if [[ ! -s "${APPIMAGETOOL}" ]]; then
+    echo "error: appimagetool download is empty" >&2
+    exit 1
+fi
 
-# clean
+chmod +x "${APPIMAGETOOL}"
+"./${APPIMAGETOOL}" "${APPDIR}"
 
-rm appimagetool-x86_64.AppImage
-rm -rf nekobox.AppDir
+if [[ ! -s "${OUTPUT}" ]]; then
+    echo "error: appimagetool did not create ${OUTPUT}" >&2
+    exit 1
+fi
