@@ -21,7 +21,7 @@ trap 'rm -rf -- "${WORK_DIR}"' EXIT
 
 RUNTIME_ARCHIVE="${WORK_DIR}/qt-runtime.zip"
 curl --fail --location --silent --show-error \
-    --retry 3 --retry-all-errors \
+    --retry 3 \
     --output "${RUNTIME_ARCHIVE}" \
     "https://github.com/MatsuriDayo/nekoray_qt_runtime/releases/download/20220503/20230202-5.12.8-ubuntu20.04-linux64.zip"
 
